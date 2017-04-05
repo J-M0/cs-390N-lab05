@@ -14,8 +14,6 @@
 
 WiFiClient client;
 
-volatile boolean lock = false;
-
 /* -------- LED Stuff -------- */
 #define PIN_LED 15 
 Adafruit_NeoPixel pixel = Adafruit_NeoPixel(1, PIN_LED, NEO_GRB + NEO_KHZ800);
@@ -77,39 +75,30 @@ void setup() {
   // Setup reed switch
   pinMode(PIN_REED, INPUT_PULLUP);
 
-  pinMode(PIN_BUTTON, INPUT);
-
   //Configure pixel light
   pixel.begin(); // initialize LED 
   pixel.setBrightness(48); // lower brightess (default is 256)  
   pixel.show();
 
   //Setup interrupts
-//  attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
-//  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
   
-//  onDoorChange(); //Take action based on beginning state
+  onDoorChange(); //Take action based on beginning state
 }
 
 void loop() {
-//  if (alarmed) {
-//    // Cycle LED
-//    pixel.setPixelColor(0, pixel.Color(255,0,0));
-//    pixel.show();
-//    delay(500);
-//    pixel.setPixelColor(0, pixel.Color(0,0,0));
-//    pixel.show();
-//    delay(500);
-//  } else {
-//    delay(50);
-//  }
-
-  if(digitalRead(PIN_BUTTON) == LOW) {
-    logEvent("Button pressed");
+  if (alarmed) {
+    // Cycle LED
+    pixel.setPixelColor(0, pixel.Color(255,0,0));
+    pixel.show();
+    delay(500);
+    pixel.setPixelColor(0, pixel.Color(0,0,0));
+    pixel.show();
+    delay(500);
+  } else {
+    delay(50);
   }
-
-//  logEvent("Test log");
-//  delay(3000);
 }
 
 void onDoorChange() {
@@ -131,7 +120,7 @@ void onDoorChange() {
 
 void onButtonPress() {
   logEvent("Button pressed");
-//  stopAlarm();
+  stopAlarm();
 }
 
 void startBuzzer() {
@@ -164,12 +153,6 @@ String getCurrentTime() {
 }
 
 void logEvent(String message) {
-  while(lock) {
-    delay(1000);
-  }
-
-  lock = true;
-  
   String logString = "[[\"" + getCurrentTime() + "\", \"" + message + "\"]]";
   Serial.print("Log event: ");
   Serial.println(logString);
@@ -202,8 +185,6 @@ void logEvent(String message) {
     Serial.print(c);
   }
   AppendValuesChoreo.close();
-
-  lock = false;
 }
 
 /*-------- NTP code ----------*/
