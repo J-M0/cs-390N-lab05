@@ -10,7 +10,7 @@
 
 #define PIN_BUTTON 0
 #define PIN_BUZZER 13
-#define PIN_REED 2
+#define PIN_REED 5
 
 WiFiClient client;
 
@@ -37,7 +37,10 @@ void sendNTPpacket(IPAddress &address);
 volatile boolean doorOpen = false;
 volatile boolean alarmed = false; // Should the alarm be on?
 volatile boolean alarm_enabled = true; // Has the alarm been enabled?
+volatile boolean buttonPressed = false;
+
 boolean silent_alarm = true;
+boolean prevDoorOpen = doorOpen;
 
 // Our functions
 String getCurrentTime();
@@ -88,6 +91,26 @@ void setup() {
 }
 
 void loop() {
+  
+  if(prevDoorOpen != doorOpen) {
+    if(doorOpen){
+      logEvent("Door opened");
+      if(alarmed) {
+        startBuzzer();
+      }
+    } else {
+      logEvent("Door closed");
+      stopAlarm();
+    }
+    prevDoorOpen = doorOpen;
+  }
+
+  if(buttonPressed) {
+    logEvent("Button pressed");
+    buttonPressed = false;
+    stopAlarm();
+  }
+  
   if (alarmed) {
     // Cycle LED
     pixel.setPixelColor(0, pixel.Color(255,0,0));
@@ -102,25 +125,20 @@ void loop() {
 }
 
 void onDoorChange() {
-  logEvent("Door status changed");
-  
   if (digitalRead(PIN_REED) == HIGH) {
     doorOpen = true;
     if (alarm_enabled) {
       alarmed = true;
-      startBuzzer();
       // The LED will be cycled in the main loop
     }
   }
   else { //digitalRead(PIN_REED) == LOW
     doorOpen = false;
-    stopAlarm();
   }
 }
 
 void onButtonPress() {
-  logEvent("Button pressed");
-  stopAlarm();
+  buttonPressed = true;
 }
 
 void startBuzzer() {
