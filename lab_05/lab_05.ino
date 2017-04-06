@@ -1,7 +1,6 @@
 #include <Time.h>
 #include <TimeLib.h>
 #include <WiFiUdp.h>
-#include <Adafruit_NeoPixel.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <Temboo.h>
@@ -11,14 +10,10 @@
 
 #define PIN_BUTTON 0
 #define PIN_BUZZER 13
+#define PIN_LED 4
 #define PIN_REED 5
 
 WiFiClient client;
-
-/* -------- LED Stuff -------- */
-#define PIN_LED 15 
-Adafruit_NeoPixel pixel = Adafruit_NeoPixel(1, PIN_LED, NEO_GRB + NEO_KHZ800);
-/* -------- End LED Stuff -------- */
 
 /* -------- NTP Stuff -------- */
 WiFiUDP Udp;
@@ -62,7 +57,7 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
-  
+
   Serial.println();
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
@@ -79,20 +74,29 @@ void setup() {
   // Setup reed switch
   pinMode(PIN_REED, INPUT_PULLUP);
 
-  //Configure pixel light
-  pixel.begin(); // initialize LED 
-  pixel.setBrightness(48); // lower brightess (default is 256)  
-  pixel.show();
-
   //Setup interrupts
   attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
-  
+
   onDoorChange(); //Take action based on beginning state
 }
 
 void loop() {
-  
+  reportEvents();
+
+  if (alarmed) {
+    // Cycle LED
+    analogWrite(PIN_LED, 512);
+    delay(500);
+    reportEvents();
+    analogWrite(PIN_LED, 0);
+    delay(500);
+  } else {
+    delay(50);
+  }
+}
+
+void reportEvents() {
   if(prevDoorOpen != doorOpen) {
     if(doorOpen){
       logEvent("Door opened");
@@ -110,18 +114,6 @@ void loop() {
     logEvent("Button pressed");
     buttonPressed = false;
     stopAlarm();
-  }
-  
-  if (alarmed) {
-    // Cycle LED
-    pixel.setPixelColor(0, pixel.Color(255,0,0));
-    pixel.show();
-    delay(500);
-    pixel.setPixelColor(0, pixel.Color(0,0,0));
-    pixel.show();
-    delay(500);
-  } else {
-    delay(50);
   }
 }
 
@@ -144,9 +136,9 @@ void onButtonPress() {
 
 void startBuzzer() {
   logEvent("Alarm sounding");
-  
+
   if (!silent_alarm) {
-    analogWrite(PIN_BUZZER, 512); 
+    analogWrite(PIN_BUZZER, 512);
     analogWriteFreq(1000);
   }
 }
@@ -154,12 +146,11 @@ void startBuzzer() {
 void stopAlarm() {
   if(alarmed) {
     logEvent("Alarm stopped");
-    
+
     alarmed = false;
     // Turn off the light
-    pixel.setPixelColor(0, pixel.Color(0,0,0));
-    pixel.show();
-  
+    analogWrite(PIN_LED, 0);
+
     // Stop the buzzer
     analogWrite(PIN_BUZZER, 0);
   }
@@ -175,7 +166,7 @@ void logEvent(String message) {
   String logString = "[[\"" + getCurrentTime() + "\", \"" + message + "\"]]";
   Serial.print("Log event: ");
   Serial.println(logString);
-  
+
   TembooChoreo AppendValuesChoreo(client);
 
   // Invoke the Temboo client
@@ -185,20 +176,20 @@ void logEvent(String message) {
   AppendValuesChoreo.setAccountName(TEMBOO_ACCOUNT);
   AppendValuesChoreo.setAppKeyName(TEMBOO_APP_KEY_NAME);
   AppendValuesChoreo.setAppKey(TEMBOO_APP_KEY);
-    
+
   // Set Choreo inputs
   AppendValuesChoreo.addInput("RefreshToken", G_REFRESH_TOKEN);
   AppendValuesChoreo.addInput("ClientSecret", G_CLIENT_SECRET);
   AppendValuesChoreo.addInput("Values", logString);
   AppendValuesChoreo.addInput("ClientID", G_CLIENT_ID);
   AppendValuesChoreo.addInput("SpreadsheetID", G_SPREADSHEET_ID);
-  
+
   // Identify the Choreo to run
   AppendValuesChoreo.setChoreo("/Library/Google/Sheets/AppendValues");
-  
+
   // Run the Choreo; when results are available, print them to serial
   AppendValuesChoreo.run();
-  
+
   while(AppendValuesChoreo.available()) {
     char c = AppendValuesChoreo.read();
     Serial.print(c);
