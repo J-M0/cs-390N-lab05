@@ -37,7 +37,7 @@ volatile boolean alarmed = false; // Should the alarm be on?
 volatile boolean alarm_enabled = true; // Has the alarm been enabled?
 volatile boolean buttonPressed = false;
 
-boolean silent_alarm = true;
+boolean silent_alarm = false;
 boolean prevDoorOpen = doorOpen;
 
 // Our functions
@@ -109,7 +109,7 @@ void reportEvents() {
     if(doorOpen){
       Blynk.virtualWrite(V0, "Open");
       logEvent("Door opened");
-      if(alarmed) {
+      if(alarm_enabled) {
         Blynk.notify("Door Alarm Triggered!");
         startBuzzer();
       }
@@ -134,8 +134,7 @@ void onDoorChange() {
       alarmed = true;
       // The LED will be cycled in the main loop
     }
-  }
-  else { //digitalRead(PIN_REED) == LOW
+  } else { //digitalRead(PIN_REED) == LOW
     doorOpen = false;
   }
 }
