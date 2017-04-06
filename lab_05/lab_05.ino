@@ -7,6 +7,7 @@
 #include <Temboo.h>
 #include "TembooAccount.h"
 #include "WiFiCreds.h"
+#include "GoogleCreds.h"
 
 #define PIN_BUTTON 0
 #define PIN_BUZZER 13
@@ -186,11 +187,11 @@ void logEvent(String message) {
   AppendValuesChoreo.setAppKey(TEMBOO_APP_KEY);
     
   // Set Choreo inputs
-  AppendValuesChoreo.addInput("RefreshToken", "1/9sCCEcIq6kMSbTKsdNam5VbaSVTq-YfpOdTJd_GJm9kyL5BAjLLuduTQyhi7g8Em");
-  AppendValuesChoreo.addInput("ClientSecret", "t_5ksvv_Pl1fP6SZE25flqqM");
+  AppendValuesChoreo.addInput("RefreshToken", G_REFRESH_TOKEN);
+  AppendValuesChoreo.addInput("ClientSecret", G_CLIENT_SECRET);
   AppendValuesChoreo.addInput("Values", logString);
-  AppendValuesChoreo.addInput("ClientID", "13405612906-l5adf3o93tfp304cp6rgct6ui9buigj5.apps.googleusercontent.com");
-  AppendValuesChoreo.addInput("SpreadsheetID", "18G0_ZlwhWQdamD5wjMZKELFqDkA9PSVelmuWC0Hzsik");
+  AppendValuesChoreo.addInput("ClientID", G_CLIENT_ID);
+  AppendValuesChoreo.addInput("SpreadsheetID", G_SPREADSHEET_ID);
   
   // Identify the Choreo to run
   AppendValuesChoreo.setChoreo("/Library/Google/Sheets/AppendValues");
