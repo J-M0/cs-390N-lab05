@@ -4,9 +4,11 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <Temboo.h>
+#include <BlynkSimpleEsp8266.h>
 #include "TembooAccount.h"
 #include "WiFiCreds.h"
 #include "GoogleCreds.h"
+#include "BlynkCreds.h"
 
 #define PIN_BUTTON 0
 #define PIN_BUZZER 13
@@ -78,10 +80,16 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
 
+  //Setup Blynk
+  Blynk.config(BLYNK_AUTH);
+
   onDoorChange(); //Take action based on beginning state
 }
 
 void loop() {
+  Blynk.run();
+  Blynk.virtualWrite(V3, alarm_enabled);
+
   reportEvents();
 
   if (alarmed) {
@@ -99,20 +107,22 @@ void loop() {
 void reportEvents() {
   if(prevDoorOpen != doorOpen) {
     if(doorOpen){
+      Blynk.virtualWrite(V0, "Open");
       logEvent("Door opened");
       if(alarmed) {
+        Blynk.notify("Door Alarm Triggered!");
         startBuzzer();
       }
     } else {
+      Blynk.virtualWrite(V0, "Closed");
       logEvent("Door closed");
-      stopAlarm();
     }
     prevDoorOpen = doorOpen;
   }
 
   if(buttonPressed) {
-    logEvent("Button pressed");
     buttonPressed = false;
+    logEvent("Button pressed");
     stopAlarm();
   }
 }
@@ -135,24 +145,24 @@ void onButtonPress() {
 }
 
 void startBuzzer() {
-  logEvent("Alarm sounding");
-
   if (!silent_alarm) {
     analogWrite(PIN_BUZZER, 512);
     analogWriteFreq(1000);
   }
+
+  logEvent("Alarm sounding");
 }
 
 void stopAlarm() {
   if(alarmed) {
-    logEvent("Alarm stopped");
-
     alarmed = false;
     // Turn off the light
     analogWrite(PIN_LED, 0);
 
     // Stop the buzzer
     analogWrite(PIN_BUZZER, 0);
+    
+    logEvent("Alarm stopped");
   }
 }
 
@@ -195,6 +205,25 @@ void logEvent(String message) {
     Serial.print(c);
   }
   AppendValuesChoreo.close();
+}
+
+BLYNK_WRITE(V1) {
+  logEvent("Calling police");
+}
+
+BLYNK_WRITE(V2) {
+  stopAlarm();
+}
+
+BLYNK_WRITE(V3) {
+  if(alarm_enabled) {
+    alarm_enabled = false;
+    alarmed = false;
+    logEvent("System disabled");
+  } else {
+    alarm_enabled = true;
+    logEvent("System enabled");
+  }
 }
 
 /*-------- NTP code ----------*/
