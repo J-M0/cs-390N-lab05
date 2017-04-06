@@ -7,14 +7,13 @@
 #include <Temboo.h>
 #include "TembooAccount.h"
 #include "WiFiCreds.h"
+#include "GoogleCreds.h"
 
 #define PIN_BUTTON 0
 #define PIN_BUZZER 13
-#define PIN_REED 2
+#define PIN_REED 5
 
 WiFiClient client;
-
-volatile boolean lock = false;
 
 /* -------- LED Stuff -------- */
 #define PIN_LED 15 
@@ -39,7 +38,10 @@ void sendNTPpacket(IPAddress &address);
 volatile boolean doorOpen = false;
 volatile boolean alarmed = false; // Should the alarm be on?
 volatile boolean alarm_enabled = true; // Has the alarm been enabled?
+volatile boolean buttonPressed = false;
+
 boolean silent_alarm = true;
+boolean prevDoorOpen = doorOpen;
 
 // Our functions
 String getCurrentTime();
@@ -77,61 +79,67 @@ void setup() {
   // Setup reed switch
   pinMode(PIN_REED, INPUT_PULLUP);
 
-  pinMode(PIN_BUTTON, INPUT);
-
   //Configure pixel light
   pixel.begin(); // initialize LED 
   pixel.setBrightness(48); // lower brightess (default is 256)  
   pixel.show();
 
   //Setup interrupts
-//  attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
-//  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(PIN_REED), onDoorChange, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), onButtonPress, RISING);
   
-//  onDoorChange(); //Take action based on beginning state
+  onDoorChange(); //Take action based on beginning state
 }
 
 void loop() {
-//  if (alarmed) {
-//    // Cycle LED
-//    pixel.setPixelColor(0, pixel.Color(255,0,0));
-//    pixel.show();
-//    delay(500);
-//    pixel.setPixelColor(0, pixel.Color(0,0,0));
-//    pixel.show();
-//    delay(500);
-//  } else {
-//    delay(50);
-//  }
-
-  if(digitalRead(PIN_BUTTON) == LOW) {
-    logEvent("Button pressed");
+  
+  if(prevDoorOpen != doorOpen) {
+    if(doorOpen){
+      logEvent("Door opened");
+      if(alarmed) {
+        startBuzzer();
+      }
+    } else {
+      logEvent("Door closed");
+      stopAlarm();
+    }
+    prevDoorOpen = doorOpen;
   }
 
-//  logEvent("Test log");
-//  delay(3000);
+  if(buttonPressed) {
+    logEvent("Button pressed");
+    buttonPressed = false;
+    stopAlarm();
+  }
+  
+  if (alarmed) {
+    // Cycle LED
+    pixel.setPixelColor(0, pixel.Color(255,0,0));
+    pixel.show();
+    delay(500);
+    pixel.setPixelColor(0, pixel.Color(0,0,0));
+    pixel.show();
+    delay(500);
+  } else {
+    delay(50);
+  }
 }
 
 void onDoorChange() {
-  logEvent("Door status changed");
-  
   if (digitalRead(PIN_REED) == HIGH) {
     doorOpen = true;
     if (alarm_enabled) {
       alarmed = true;
-      startBuzzer();
       // The LED will be cycled in the main loop
     }
   }
   else { //digitalRead(PIN_REED) == LOW
     doorOpen = false;
-    stopAlarm();
   }
 }
 
 void onButtonPress() {
-  logEvent("Button pressed");
-//  stopAlarm();
+  buttonPressed = true;
 }
 
 void startBuzzer() {
@@ -164,12 +172,6 @@ String getCurrentTime() {
 }
 
 void logEvent(String message) {
-  while(lock) {
-    delay(1000);
-  }
-
-  lock = true;
-  
   String logString = "[[\"" + getCurrentTime() + "\", \"" + message + "\"]]";
   Serial.print("Log event: ");
   Serial.println(logString);
@@ -185,11 +187,11 @@ void logEvent(String message) {
   AppendValuesChoreo.setAppKey(TEMBOO_APP_KEY);
     
   // Set Choreo inputs
-  AppendValuesChoreo.addInput("RefreshToken", "1/9sCCEcIq6kMSbTKsdNam5VbaSVTq-YfpOdTJd_GJm9kyL5BAjLLuduTQyhi7g8Em");
-  AppendValuesChoreo.addInput("ClientSecret", "t_5ksvv_Pl1fP6SZE25flqqM");
+  AppendValuesChoreo.addInput("RefreshToken", G_REFRESH_TOKEN);
+  AppendValuesChoreo.addInput("ClientSecret", G_CLIENT_SECRET);
   AppendValuesChoreo.addInput("Values", logString);
-  AppendValuesChoreo.addInput("ClientID", "13405612906-l5adf3o93tfp304cp6rgct6ui9buigj5.apps.googleusercontent.com");
-  AppendValuesChoreo.addInput("SpreadsheetID", "18G0_ZlwhWQdamD5wjMZKELFqDkA9PSVelmuWC0Hzsik");
+  AppendValuesChoreo.addInput("ClientID", G_CLIENT_ID);
+  AppendValuesChoreo.addInput("SpreadsheetID", G_SPREADSHEET_ID);
   
   // Identify the Choreo to run
   AppendValuesChoreo.setChoreo("/Library/Google/Sheets/AppendValues");
@@ -202,8 +204,6 @@ void logEvent(String message) {
     Serial.print(c);
   }
   AppendValuesChoreo.close();
-
-  lock = false;
 }
 
 /*-------- NTP code ----------*/
